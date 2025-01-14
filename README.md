@@ -128,7 +128,7 @@ By breaking down the attention computation into smaller pieces, **FragmentStream
 
 Let me know if you'd like to adjust or expand any part of this explanation further!
 
-# Yes It may sound funny but it make signifact changes
+# Yes, it may sound funny, but it makes significant changes.
 
 
 **Code Snippet Example (FragmentStream_Attention):**
