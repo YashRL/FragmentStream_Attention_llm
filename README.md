@@ -42,46 +42,88 @@ This repository presents an efficient and scalable approach to implementing tran
 
 ## Implementation Overview
 
-### Traditional Attention (simplified)
-- In traditional attention, memory usage scales quadratically with the sequence length (O(T²)). This requires storing the full attention matrix, which becomes impractical for large sequences.
+Certainly! Here’s how you can structure this section in your README, emphasizing the comparison between traditional attention and the FragmentStream_Attention:
 
-### FragmentStream_Attention (Optimized Approach)
-- Instead of processing the entire attention matrix at once, FragmentStream processes the data in fragments (default 128 tokens). This reduces the memory load while maintaining efficiency in training.
+---
 
- Traditional Attention (simplified)
- B, T, C = x.shape  # B=batch size, T=sequence length, C=dimensions
- q = self.query(x)  # (B, T, C)
- k = self.key(x)    # (B, T, C)
+### **Traditional Attention vs FragmentStream_Attention**
 
+In traditional transformer models, attention is computed in a way that requires storing the entire attention matrix in memory, which becomes impractical when dealing with long sequences. Here's a simplified breakdown:
 
-Store ALL attention scores at once!
+#### **Traditional Attention (Simplified)**
+
+In the traditional approach, we compute attention over the entire sequence at once. For each input tensor, we calculate queries (`q`), keys (`k`), and values (`v`) from the input sequence:
+
+```python
+B, T, C = x.shape  # B = batch size, T = sequence length, C = number of features
+q = self.query(x)  # (B, T, C)
+k = self.key(x)    # (B, T, C)
+```
+
+Now, we calculate the attention scores between all queries and keys using a matrix multiplication:
+
+```python
 attention_scores = q @ k.transpose(-2, -1)  # (B, T, T) - This is huge!
 attention = softmax(attention_scores) @ v    # More memory usage
+```
 
+In this process, we calculate the full attention matrix, which has a shape of `(B, T, T)`. As the sequence length (`T`) grows, the memory requirements increase quadratically (`O(T²)`), making it difficult to scale this approach for long sequences.
 
-Now what I did is simply divided the process into batches
+#### **FragmentStream_Attention (Optimized Approach)**
 
+In contrast, **FragmentStream_Attention** optimizes this by breaking the attention computation into smaller fragments, greatly reducing memory usage. Instead of processing the entire attention matrix, we divide the sequence into smaller chunks and process them independently.
 
-Our FragmentStream_Attention implementation (simplified)
+Here’s how the **FragmentStream_Attention** approach works:
 
+```python
 fragment_size = 128  # Process 128 tokens at a time
 for i in range(0, T, fragment_size):  # Process queries in fragments
-     q_fragment = q[:, i:i+fragment_size]  # Take small group of queries
-     for j in range(0, T, fragment_size):  # Process keys/values in fragments
-         k_fragment = k[:, j:j+fragment_size]  # Take small group of keys
-         v_fragment = v[:, j:j+fragment_size]  # And corresponding values        
-         # Compare only these small fragments
-         scores = q_fragment @ k_fragment.transpose(-2, -1)
-         # Process and accumulate results
+    q_fragment = q[:, i:i+fragment_size]  # Take a small group of queries
+    for j in range(0, T, fragment_size):  # Process keys/values in fragments
+        k_fragment = k[:, j:j+fragment_size]  # Take a small group of keys
+        v_fragment = v[:, j:j+fragment_size]  # And the corresponding values        
+        # Compute attention only on these small fragments
+        scores = q_fragment @ k_fragment.transpose(-2, -1)
+        # Process and accumulate results
+```
 
+This method reduces memory consumption by only keeping a small portion of the attention matrix in memory at any given time.
 
-example:
- [Full Matrix in Memory]                              # [fragment 1]   [Clean Up]   [fragment 2]   [Clean Up]
- X X X X X X X X X X                                  # X X X       ➜           X X X     ➜ 
- X X X X X X X X X X            =========>>>          # X X X       ➜           X X X     ➜ 
- X X X X X X X X X X                                  # X X X       ➜           X X X     ➜ 
- X X X X X X X X X X                                  # X X X       ➜           X X X     ➜ 
+#### **Visualizing the Process**
 
+Here’s an example to visualize the difference:
+
+1. **Traditional Attention (Full Matrix in Memory)**
+
+    The full attention matrix is computed and stored in memory. This consumes a large amount of memory, especially as `T` increases.
+
+    ```
+    [Full Matrix in Memory]
+    X X X X X X X X X X
+    X X X X X X X X X X
+    X X X X X X X X X X
+    X X X X X X X X X X
+    ```
+
+2. **FragmentStream_Attention (Fragments Processed Sequentially)**
+
+    In **FragmentStream_Attention**, we process small fragments of the sequence, cleaning up each fragment after it’s processed before moving on to the next one:
+
+    ```
+    [fragment 1]   [Clean Up]   [fragment 2]   [Clean Up]
+    X X X ➜ X X X ➜ X X X ➜ X X X
+    X X X ➜ X X X ➜ X X X ➜ X X X
+    ```
+
+    This reduces memory requirements significantly because we only keep a small part of the attention matrix in memory at any given moment.
+
+---
+
+By breaking down the attention computation into smaller pieces, **FragmentStream_Attention** achieves memory efficiency, allowing the model to process long sequences that would otherwise exceed the memory capacity of most GPUs.
+
+---
+
+Let me know if you'd like to adjust or expand any part of this explanation further!
 
 # Yes It may sound funny but it make signifact changes
 
