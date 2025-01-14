@@ -110,9 +110,12 @@ Here’s an example to visualize the difference:
     In **FragmentStream_Attention**, we process small fragments of the sequence, cleaning up each fragment after it’s processed before moving on to the next one:
 
     ```
-    [fragment 1]   [Clean Up]   [fragment 2]   [Clean Up]
-    X X X ➜ X X X ➜ X X X ➜ X X X
-    X X X ➜ X X X ➜ X X X ➜ X X X
+    [fragment 1]    [Full Matrix in Memory]           [fragment 1]   [Clean Up]   [fragment 2]   [Clean Up]
+    X X X X X X X X X X                                   X X X          ➜           X X X          ➜ 
+    X X X X X X X X X X            =========>>>           X X X          ➜           X X X          ➜ 
+    X X X X X X X X X X                                   X X X          ➜           X X X          ➜ 
+    X X X X X X X X X X                                   X X X          ➜           X X X          ➜ 
+
     ```
 
     This reduces memory requirements significantly because we only keep a small part of the attention matrix in memory at any given moment.
