@@ -19,6 +19,149 @@ The model is based on the transformer architecture and uses a custom attention m
 
 ---
 
+**FragmentStream_Attention** is an innovative attempt at replicating **flash attention** from scratch while optimizing memory usage, especially for those without access to cutting-edge GPUs like Aphere or Hopper architectures. By processing attention in small, manageable fragments instead of computing the full attention matrix at once, **FragmentStream_Attention** enables training large transformer models on consumer-grade GPUs without overwhelming memory resources. 
+
+This repository presents an efficient and scalable approach to implementing transformers using the **FragmentStream Attention** mechanism, ideal for use cases that require memory optimization.
+
+---
+
+## Key Features
+
+### 1. **FragmentStream Attention (Key Innovation)**
+- **Memory Efficient:** FragmentStream Attention processes attention in small chunks (128 tokens at a time), significantly reducing memory consumption compared to the traditional O(n²) memory complexity of full attention.
+- **Optimized for Consumer GPUs:** With this mechanism, transformer models can be trained on GPUs with less memory, making it more accessible for smaller-scale setups.
+  
+### 2. **Adaptive Architecture**
+- **Dynamic Head Selection:** The architecture dynamically adjusts the number of attention heads based on the sequence length, optimizing memory usage and computation.
+- **Pre-LayerNorm:** Pre-LayerNorm architecture is used to improve training stability and enhance model performance.
+
+### 3. **Efficient Training on Consumer Hardware**
+- This model has been successfully trained using Kaggle’s P100 GPU and achieved strong results with significantly reduced computational requirements.
+  
+---
+
+## Implementation Overview
+
+### Traditional Attention (simplified)
+- In traditional attention, memory usage scales quadratically with the sequence length (O(T²)). This requires storing the full attention matrix, which becomes impractical for large sequences.
+
+### FragmentStream_Attention (Optimized Approach)
+- Instead of processing the entire attention matrix at once, FragmentStream processes the data in fragments (default 128 tokens). This reduces the memory load while maintaining efficiency in training.
+
+# # Traditional Attention (simplified)
+# B, T, C = x.shape  # B=batch size, T=sequence length, C=dimensions
+# q = self.query(x)  # (B, T, C)
+# k = self.key(x)    # (B, T, C)
+
+
+# # Store ALL attention scores at once!
+# attention_scores = q @ k.transpose(-2, -1)  # (B, T, T) - This is huge!
+# attention = softmax(attention_scores) @ v    # More memory usage
+
+
+# Now what I did is simply divided the process into batches
+
+
+# # Our FragmentStream_Attention implementation (simplified)
+
+# fragment_size = 128  # Process 128 tokens at a time
+# for i in range(0, T, fragment_size):  # Process queries in fragments
+#     q_fragment = q[:, i:i+fragment_size]  # Take small group of queries
+#     for j in range(0, T, fragment_size):  # Process keys/values in fragments
+#         k_fragment = k[:, j:j+fragment_size]  # Take small group of keys
+#         v_fragment = v[:, j:j+fragment_size]  # And corresponding values        
+#         # Compare only these small fragments
+#         scores = q_fragment @ k_fragment.transpose(-2, -1)
+#         # Process and accumulate results
+
+
+#example:
+# [Full Matrix in Memory]                              # [fragment 1]   [Clean Up]   [fragment 2]   [Clean Up]
+# X X X X X X X X X X                                  # X X X       ➜           X X X     ➜ 
+# X X X X X X X X X X            =========>>>          # X X X       ➜           X X X     ➜ 
+# X X X X X X X X X X                                  # X X X       ➜           X X X     ➜ 
+# X X X X X X X X X X                                  # X X X       ➜           X X X     ➜ 
+
+
+# Yes It may sound funny but it make signifact changes
+
+
+**Code Snippet Example (FragmentStream_Attention):**
+```python
+class FragmentStream_Attention(nn.Module):
+    def __init__(self, head_size, block_size, dropout):
+        super().__init__()
+        self.head_size = head_size
+        self.fragment_size = 128  # Adjust based on your GPU memory
+        self.dropout = nn.Dropout(dropout)
+        self.register_buffer('tril', torch.tril(torch.ones(block_size, block_size)))
+        
+    def forward(self, q, k, v):
+        B, T, C = q.shape
+        out = torch.zeros_like(v)
+
+        for i in range(0, T, self.fragment_size):
+            j_start = i
+            j_end = min(T, i + self.fragment_size)
+            q_fragment = q[:, i:j_end]
+
+            attn_weights = torch.zeros(B, j_end-i, T, device=q.device)
+            
+            for j in range(0, T, self.fragment_size):
+                k_fragment = k[:, j:min(T, j + self.fragment_size)]
+                scores = (q_fragment @ k_fragment.transpose(-2, -1)) * (C ** -0.5)
+                
+                scores = scores.masked_fill(self.tril[i:j_end, j:min(T, j + self.fragment_size)] == 0, float('-inf'))
+                attn_weights[:, :, j:min(T, j + self.fragment_size)] = scores
+
+            attn_weights = F.softmax(attn_weights, dim=-1)
+            attn_weights = self.dropout(attn_weights)
+
+            for j in range(0, T, self.fragment_size):
+                v_fragment = v[:, j:min(T, j + self.fragment_size)]
+                out[:, i:j_end] += attn_weights[:, :, j:min(T, j + self.fragment_size)] @ v_fragment
+
+        return out
+```
+
+---
+
+## Practical Results
+
+**Dataset:**
+- The model was successfully trained on a healthcare dataset using Kaggle’s P100 GPU.
+
+**Results:**
+- The model demonstrated:
+  - **Coherent medical responses** when queried.
+  - A strong **understanding of medical contexts**.
+  - **Lower computational overhead** compared to traditional transformer architectures, making it suitable for environments with limited resources.
+
+---
+
+## Open Source & Community
+
+This project is open source and aims to contribute to the community by providing a scalable, memory-efficient transformer model that can be easily adapted for various applications.
+
+- **Use Cases:**
+  - Memory-efficient transformers for large sequence data.
+  - Experimentation with novel attention mechanisms in NLP, vision, and other fields.
+  - Developers working with constrained hardware.
+
+- **Key Contributions:**
+  - FragmentStream Attention for improved memory usage.
+  - Adaptive head selection for better efficiency based on input length.
+  - Full implementation of transformer architecture optimized for GPUs with limited VRAM.
+
+---
+
+## Conclusion
+
+**FragmentStream_Attention** introduces a novel method for efficiently processing large sequences with transformers. It reduces memory requirements by processing attention in small fragments, making it a practical solution for developers working with limited GPU memory. If you have any questions or wish to contribute to the project, feel free to open an issue or submit a pull request!
+
+Happy experimenting!
+---
+
 ## **Installation**
 
 To run this model, ensure you have the following dependencies installed:
