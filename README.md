@@ -48,39 +48,39 @@ This repository presents an efficient and scalable approach to implementing tran
 ### FragmentStream_Attention (Optimized Approach)
 - Instead of processing the entire attention matrix at once, FragmentStream processes the data in fragments (default 128 tokens). This reduces the memory load while maintaining efficiency in training.
 
-# # Traditional Attention (simplified)
-# B, T, C = x.shape  # B=batch size, T=sequence length, C=dimensions
-# q = self.query(x)  # (B, T, C)
-# k = self.key(x)    # (B, T, C)
+ Traditional Attention (simplified)
+ B, T, C = x.shape  # B=batch size, T=sequence length, C=dimensions
+ q = self.query(x)  # (B, T, C)
+ k = self.key(x)    # (B, T, C)
 
 
-# # Store ALL attention scores at once!
-# attention_scores = q @ k.transpose(-2, -1)  # (B, T, T) - This is huge!
-# attention = softmax(attention_scores) @ v    # More memory usage
+Store ALL attention scores at once!
+attention_scores = q @ k.transpose(-2, -1)  # (B, T, T) - This is huge!
+attention = softmax(attention_scores) @ v    # More memory usage
 
 
-# Now what I did is simply divided the process into batches
+Now what I did is simply divided the process into batches
 
 
-# # Our FragmentStream_Attention implementation (simplified)
+Our FragmentStream_Attention implementation (simplified)
 
-# fragment_size = 128  # Process 128 tokens at a time
-# for i in range(0, T, fragment_size):  # Process queries in fragments
-#     q_fragment = q[:, i:i+fragment_size]  # Take small group of queries
-#     for j in range(0, T, fragment_size):  # Process keys/values in fragments
-#         k_fragment = k[:, j:j+fragment_size]  # Take small group of keys
-#         v_fragment = v[:, j:j+fragment_size]  # And corresponding values        
-#         # Compare only these small fragments
-#         scores = q_fragment @ k_fragment.transpose(-2, -1)
-#         # Process and accumulate results
+fragment_size = 128  # Process 128 tokens at a time
+for i in range(0, T, fragment_size):  # Process queries in fragments
+     q_fragment = q[:, i:i+fragment_size]  # Take small group of queries
+     for j in range(0, T, fragment_size):  # Process keys/values in fragments
+         k_fragment = k[:, j:j+fragment_size]  # Take small group of keys
+         v_fragment = v[:, j:j+fragment_size]  # And corresponding values        
+         # Compare only these small fragments
+         scores = q_fragment @ k_fragment.transpose(-2, -1)
+         # Process and accumulate results
 
 
-#example:
-# [Full Matrix in Memory]                              # [fragment 1]   [Clean Up]   [fragment 2]   [Clean Up]
-# X X X X X X X X X X                                  # X X X       ➜           X X X     ➜ 
-# X X X X X X X X X X            =========>>>          # X X X       ➜           X X X     ➜ 
-# X X X X X X X X X X                                  # X X X       ➜           X X X     ➜ 
-# X X X X X X X X X X                                  # X X X       ➜           X X X     ➜ 
+example:
+ [Full Matrix in Memory]                              # [fragment 1]   [Clean Up]   [fragment 2]   [Clean Up]
+ X X X X X X X X X X                                  # X X X       ➜           X X X     ➜ 
+ X X X X X X X X X X            =========>>>          # X X X       ➜           X X X     ➜ 
+ X X X X X X X X X X                                  # X X X       ➜           X X X     ➜ 
+ X X X X X X X X X X                                  # X X X       ➜           X X X     ➜ 
 
 
 # Yes It may sound funny but it make signifact changes
